@@ -1,6 +1,5 @@
 import pytest
 import hypothesis
-
 from pyjexl.analysis import JEXLAnalyzer
 from pyjexl.exceptions import MissingTransformError, ParseError
 from pyjexl.jexl import JEXL

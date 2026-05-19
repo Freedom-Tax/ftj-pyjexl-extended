@@ -1,44 +1,31 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "pyjexl-extended"
+[tool.poetry]
+name = "ftj-pyjexl-extended"
 version = "0.2.2"
 description = "A JEXL parser and evaluator with extended grammar (80+ built-in functions and transforms)."
 readme = "README.md"
-requires-python = ">=3.6"
-authors = [{ name = "nikoraes", email = "niko.raes@gmail.com" }]
-license = { file = "LICENSE" }
+authors = ["nikoraes <niko.raes@gmail.com>", "Sumeet Mulay <sumeet@freedomtax.jp>"]
+license = "MIT"
 keywords = ["jexl", "expression", "parser", "grammar", "extended"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Topic :: Software Development",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-]
-dependencies = [
-    "parsimonious",
-    "future",
-    "python-dateutil",
-    "pytz"
-]
+packages = [{include = "pyjexl"}]
 
-[project.urls]
+[tool.poetry.dependencies]
+python = ">=3.10"
+parsimonious = "*"
+future = "*"
+python-dateutil = "*"
+pytz = "*"
+
+
+[tool.poetry.urls]
 Homepage = "https://github.com/konnektr-io/pyjexl-extended"
 Repository = "https://github.com/konnektr-io/pyjexl-extended"
-Playground = "https://jexl-playground.konnektr.io/"
 
-
-[tool.setuptools.packages.find]
-exclude = ["tests*", "tests"]
-
-[tool.setuptools]
-include-package-data = true
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.3,<10.0.0)",
+    "flake8 (>=7.3.0,<8.0.0)",
+    "hypothesis (>=6.152.8,<7.0.0)"
+]

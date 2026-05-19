@@ -1,10 +1,11 @@
+import base64
 import datetime
 import functools
 import json
 import math
 import random
 import re
-import base64
+
 import uuid
 from dateutil import parser as dtparser
 import pytz
@@ -304,7 +305,9 @@ class ExtendedGrammar:
         rest = [v for v in rest]
         if len(rest) > 0 and isinstance(rest[0], list):
             rest = [v for va in rest for v in va]
-        values = value + rest
+        values = [v for v in value + rest if v is not None]
+        if not values:
+            return 0.0
         return float(sum(values) / len(values))
 
     @staticmethod
@@ -375,7 +378,14 @@ class ExtendedGrammar:
     def array_distinct(value):
         if not isinstance(value, list):
             value = [value]
-        return list(set(value))
+        seen = set()
+        result = []
+        for v in value:
+            key = json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else v
+            if key not in seen:
+                seen.add(key)
+                result.append(v)
+        return result
 
     @staticmethod
     def array_to_object(input, val=None):
@@ -414,7 +424,9 @@ class ExtendedGrammar:
         expr = self.jexl.parse(expression)
         return any(
             [
-                self.jexl.evaluate(expr, {"value": value, "index": index, "array": input})
+                self.jexl.evaluate(
+                    expr, {"value": value, "index": index, "array": input}
+                )
                 for index, value in enumerate(input)
             ]
         )
@@ -425,7 +437,9 @@ class ExtendedGrammar:
         expr = self.jexl.parse(expression)
         return all(
             [
-                self.jexl.evaluate(expr, {"value": value, "index": index, "array": input})
+                self.jexl.evaluate(
+                    expr, {"value": value, "index": index, "array": input}
+                )
                 for index, value in enumerate(input)
             ]
         )
@@ -437,7 +451,9 @@ class ExtendedGrammar:
         return [
             value
             for index, value in enumerate(input)
-            if self.jexl.evaluate(expr, {"value": value, "index": index, "array": input})
+            if self.jexl.evaluate(
+                expr, {"value": value, "index": index, "array": input}
+            )
         ]
 
     def array_find(self, input, expression):
@@ -448,7 +464,9 @@ class ExtendedGrammar:
             (
                 value
                 for index, value in enumerate(input)
-                if self.jexl.evaluate(expr, {"value": value, "index": index, "array": input})
+                if self.jexl.evaluate(
+                    expr, {"value": value, "index": index, "array": input}
+                )
             ),
             None,
         )
@@ -458,7 +476,9 @@ class ExtendedGrammar:
             return None
         expr = self.jexl.parse(expression)
         for index, value in enumerate(input):
-            if self.jexl.evaluate(expr, {"value": value, "index": index, "array": input}):
+            if self.jexl.evaluate(
+                expr, {"value": value, "index": index, "array": input}
+            ):
                 return index
         return -1
 
@@ -468,7 +488,7 @@ class ExtendedGrammar:
         expr = self.jexl.parse(expression)
         return functools.reduce(
             lambda acc, value: self.jexl.evaluate(
-                expr, {"accumulator": acc, "value": value}
+                expr, {"accumulator": acc, "value": value, "array": input}
             ),
             input,
             initialValue,
@@ -622,14 +642,11 @@ class ExtendedGrammar:
         """
         Converts an ISO datetime string to a target timezone, handling daylight savings, and returns an ISO string with the correct offset.
         """
-        # Minimal Windows to IANA mapping (extend as needed)
         WINDOWS_TZ_MAP = {
             "Pacific Standard Time": "America/Los_Angeles",
             "UTC": "UTC",
-            # Add more mappings as needed
         }
 
-        # Parse input datetime
         if not isinstance(input, str):
             input = ExtendedGrammar.to_string(input)
         try:
@@ -637,13 +654,11 @@ class ExtendedGrammar:
         except Exception:
             return None
 
-        # Ensure datetime is aware (UTC if Z or no offset)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=pytz.UTC)
 
         tz_str = ExtendedGrammar.to_string(target_timezone)
 
-        # Check for fixed offset (e.g., +02:00, -08:00)
         offset_match = re.match(r"^([+-])(\d{2}):(\d{2})$", tz_str)
         if offset_match:
             sign = 1 if offset_match.group(1) == "+" else -1
@@ -653,12 +668,10 @@ class ExtendedGrammar:
             tzinfo = datetime.timezone(offset)
             dt_converted = dt.astimezone(tzinfo)
         else:
-            # Try Windows mapping
             iana_tz = WINDOWS_TZ_MAP.get(tz_str, tz_str)
             try:
                 tzinfo = pytz.timezone(iana_tz)
             except Exception:
-                # Try to find by case-insensitive match
                 try:
                     tzinfo = next(
                         z
@@ -669,18 +682,17 @@ class ExtendedGrammar:
                     return None
             dt_converted = dt.astimezone(tzinfo)
 
-        # Format: ISO string with 7 digits microseconds and offset
-        iso_str = dt_converted.strftime("%Y-%m-%dT%H:%M:%S.%f%z")
-        # Insert colon in offset for ISO compliance
-        if iso_str.endswith("+0000"):
-            iso_str = iso_str[:-5] + "+00:00"
-        elif iso_str[-5] in ["+", "-"]:
-            iso_str = iso_str[:-5] + iso_str[-5:-2] + ":" + iso_str[-2:]
-        # Truncate microseconds to 7 digits
-        if "." in iso_str:
-            ms = iso_str.split(".")[1][:7]
-            iso_str = iso_str.split(".")[0] + "." + ms + iso_str[-6:]
-        return iso_str
+        # Build output cleanly — separate datetime, microseconds, offset
+        offset = dt_converted.strftime("%z")  # e.g. '-0800'
+        offset_formatted = offset[:3] + ":" + offset[3:]  # e.g. '-08:00'
+        microseconds = dt_converted.strftime("%f") + "0"  # 6 digits + 1 = 7 digits
+
+        return (
+            dt_converted.strftime("%Y-%m-%dT%H:%M:%S")
+            + "."
+            + microseconds
+            + offset_formatted
+        )
 
     @staticmethod
     def local_time_to_iso_with_offset(local_time, time_zone):

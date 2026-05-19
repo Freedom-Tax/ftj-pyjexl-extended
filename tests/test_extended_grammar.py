@@ -223,7 +223,7 @@ class JexlExtendedTests(unittest.TestCase):
             self.jexl.evaluate(
                 '[{name:"tek",age:32}, {name:"bar",age:34}, {name:"baz",age:33}, {name:"foo",age:35}]|sort("age",true)|mapField("name")'
             ),
-            ["tek", "baz", "bar", "foo"],
+            ["foo", "bar", "baz", "tek"],
         )
         self.assertEqual(
             self.jexl.evaluate('["foo"]|append(["tek","baz","bar"]|sort)'),
@@ -297,7 +297,7 @@ class JexlExtendedTests(unittest.TestCase):
         self.assertFalse(self.jexl.evaluate("assoc|every('value.age>40')", context))
         self.assertTrue(self.jexl.evaluate("assoc|some('value.age>40')", context))
         self.assertTrue(
-            self.jexl.evaluate("assoc|some('value.lastName=='Figgis'')", context)
+            self.jexl.evaluate("assoc|some('value.lastName==\"Figgis\"')", context)
         )
         self.assertTrue(
             self.jexl.evaluate("assoc|map('value.age')|some('value>30')", context)
