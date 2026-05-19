@@ -1,4 +1,5 @@
 import unittest
+
 from pyjexl import JexlExtended
 
 
@@ -6,6 +7,118 @@ class JexlExtendedTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.jexl = JexlExtended()
+
+    def test_ftj_amount(self):
+        amount1 = {
+            "originalValue": 1000,
+            "convertedValue": 9.09,
+            "baseCurrency": "JPY",
+            "baseCurrencySymbol": "¥",
+            "homeCurrency": "USD",
+            "homeCurrencySymbol": "$",
+        }
+        amount2 = {
+            "originalValue": 2000,
+            "convertedValue": 18.18,
+            "baseCurrency": "JPY",
+            "baseCurrencySymbol": "¥",
+            "homeCurrency": "USD",
+            "homeCurrencySymbol": "$",
+        }
+
+        # Add
+        self.assertEqual(
+            self.jexl.evaluate(
+                "amount1|ftjAmountAdd(amount2)",
+                {"amount1": amount1, "amount2": amount2},
+            ),
+            {
+                "originalValue": 3000,
+                "convertedValue": 27.27,
+                "baseCurrency": "JPY",
+                "homeCurrency": "USD",
+            },
+        )
+
+        # Subtract
+        self.assertEqual(
+            self.jexl.evaluate(
+                "amount2|ftjAmountSubtract(amount1)",
+                {"amount1": amount1, "amount2": amount2},
+            ),
+            {
+                "originalValue": 1000,
+                "convertedValue": 9.09,
+                "baseCurrency": "JPY",
+                "homeCurrency": "USD",
+            },
+        )
+
+        # Multiply
+        self.assertEqual(
+            self.jexl.evaluate("amount1|ftjAmountMultiply(2)", {"amount1": amount1}),
+            {
+                "originalValue": 2000,
+                "convertedValue": 18.18,
+                "baseCurrency": "JPY",
+                "homeCurrency": "USD",
+            },
+        )
+
+        # Converted value is zero
+        amount_unresolved = {
+            "originalValue": 1000,
+            "convertedValue": 0,
+            "baseCurrency": "JPY",
+            "baseCurrencySymbol": "¥",
+            "homeCurrency": "USD",
+            "homeCurrencySymbol": "$",
+        }
+        self.assertEqual(
+            self.jexl.evaluate(
+                "amount|ftjAmountMultiply(2)", {"amount": amount_unresolved}
+            ),
+            {
+                "originalValue": 2000,
+                "convertedValue": 0,
+                "baseCurrency": "JPY",
+                "homeCurrency": "USD",
+            },
+        )
+
+        # Same currency
+        amount_same = {
+            "originalValue": 1000,
+            "convertedValue": 1000,
+            "baseCurrency": "JPY",
+            "baseCurrencySymbol": "¥",
+            "homeCurrency": "JPY",
+            "homeCurrencySymbol": "¥",
+        }
+        self.assertEqual(
+            self.jexl.evaluate("amount|ftjAmountMultiply(3)", {"amount": amount_same}),
+            {
+                "originalValue": 3000,
+                "convertedValue": 3000,
+                "baseCurrency": "JPY",
+                "homeCurrency": "JPY",
+            },
+        )
+
+        # Mismatched currencies should raise
+        amount_usd = {
+            "originalValue": 500,
+            "convertedValue": 500,
+            "baseCurrency": "USD",
+            "baseCurrencySymbol": "$",
+            "homeCurrency": "JPY",
+            "homeCurrencySymbol": "¥",
+        }
+        with self.assertRaises(Exception):
+            self.jexl.evaluate(
+                "amount1|ftjAmountAdd(amount2)",
+                {"amount1": amount1, "amount2": amount_usd},
+            )
 
     def test_string(self):
         self.assertEqual(self.jexl.evaluate("string(123)"), "123")

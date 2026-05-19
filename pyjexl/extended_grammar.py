@@ -5,17 +5,105 @@ import json
 import math
 import random
 import re
-
 import uuid
-from dateutil import parser as dtparser
+from typing import Any
+
+import pythonmonkey as pm
 import pytz
+from dateutil import parser as dtparser
 
 from pyjexl.jexl import JEXL
 
 
 class ExtendedGrammar:
+
     def __init__(self, jexl: JEXL):
         self.jexl = jexl
+        self._load_ftj_js()
+
+    def _load_ftj_js(self):
+        import os
+
+        js_path = os.path.join(os.path.dirname(__file__), "js", "test.js")
+        with open(js_path, "r") as f:
+            js_code = f.read()
+
+        pm.eval(f"""
+        (function() {{
+            {js_code}
+            globalThis.FTJCurrency = FTJCurrency;
+            globalThis.FTJAmount = FTJAmount;
+            globalThis.addTwoAmounts = addTwoAmounts;
+            globalThis.subtractTwoAmounts = subtractTwoAmounts;
+            globalThis.multiplyAmount = multiplyAmount;
+        }})()
+        """)
+
+    """JS functions"""
+
+    def ftj_amount_add(self, amount1: dict, amount2: dict) -> dict:
+        result = pm.eval("""
+            (function(a, b) {
+                const base1 = new FTJCurrency(a.baseCurrency, a.baseCurrencySymbol);
+                const home1 = new FTJCurrency(a.homeCurrency, a.homeCurrencySymbol);
+                const base2 = new FTJCurrency(b.baseCurrency, b.baseCurrencySymbol);
+                const home2 = new FTJCurrency(b.homeCurrency, b.homeCurrencySymbol);
+                const ftjAmount1 = new FTJAmount({
+                    originalValue: a.originalValue,
+                    convertedValue: a.convertedValue,
+                    baseCurrency: base1,
+                    homeCurrency: home1,
+                });
+                const ftjAmount2 = new FTJAmount({
+                    originalValue: b.originalValue,
+                    convertedValue: b.convertedValue,
+                    baseCurrency: base2,
+                    homeCurrency: home2,
+                });
+                return addTwoAmounts(ftjAmount1, ftjAmount2);
+            })
+        """)(amount1, amount2)
+        return dict(result)
+
+    def ftj_amount_subtract(self, amount1: dict, amount2: dict) -> dict:
+        result = pm.eval("""
+            (function(a, b) {
+                const base1 = new FTJCurrency(a.baseCurrency, a.baseCurrencySymbol);
+                const home1 = new FTJCurrency(a.homeCurrency, a.homeCurrencySymbol);
+                const base2 = new FTJCurrency(b.baseCurrency, b.baseCurrencySymbol);
+                const home2 = new FTJCurrency(b.homeCurrency, b.homeCurrencySymbol);
+                const ftjAmount1 = new FTJAmount({
+                    originalValue: a.originalValue,
+                    convertedValue: a.convertedValue,
+                    baseCurrency: base1,
+                    homeCurrency: home1,
+                });
+                const ftjAmount2 = new FTJAmount({
+                    originalValue: b.originalValue,
+                    convertedValue: b.convertedValue,
+                    baseCurrency: base2,
+                    homeCurrency: home2,
+                });
+                return subtractTwoAmounts(ftjAmount1, ftjAmount2);
+            })
+        """)(amount1, amount2)
+        return dict(result)
+
+    def ftj_amount_multiply(self, amount: dict, factor: float) -> dict:
+        result = pm.eval("""
+            (function(a, factor) {
+                const base = new FTJCurrency(a.baseCurrency, a.baseCurrencySymbol);
+                const home = new FTJCurrency(a.homeCurrency, a.homeCurrencySymbol);
+                const ftjAmount = new FTJAmount({
+                    originalValue: a.originalValue,
+                    convertedValue: a.convertedValue,
+                    baseCurrency: base,
+                    homeCurrency: home,
+                });
+                return multiplyAmount(ftjAmount, factor);
+            })
+        """)(amount, factor)
+        return dict(result)
 
     """String functions"""
 
@@ -38,7 +126,7 @@ class ExtendedGrammar:
         return len(value)
 
     @staticmethod
-    def substring(value: any, start: int, length: int = None):
+    def substring(value: Any, start: int, length: int | None = None):
         if not isinstance(value, str):
             value = json.dumps(value)
         start_num = start
@@ -56,7 +144,7 @@ class ExtendedGrammar:
         return value[start_num:fin]
 
     @staticmethod
-    def substring_before(value: any, chars: any):
+    def substring_before(value: Any, chars: Any):
         if not isinstance(value, str):
             value = ExtendedGrammar.to_string(value)
         if not isinstance(chars, str):
@@ -67,7 +155,7 @@ class ExtendedGrammar:
         return value[:index]
 
     @staticmethod
-    def substring_after(value: any, chars: any):
+    def substring_after(value: Any, chars: Any):
         if not isinstance(value, str):
             value = ExtendedGrammar.to_string(value)
         if not isinstance(chars, str):
@@ -158,9 +246,11 @@ class ExtendedGrammar:
     def form_url_encoded(value):
         if isinstance(value, str):
             import urllib.parse
+
             return urllib.parse.quote(value)
         elif isinstance(value, dict):
             import urllib.parse
+
             return urllib.parse.urlencode(value)
         return ""
 
@@ -539,9 +629,13 @@ class ExtendedGrammar:
     @staticmethod
     def to_datetime(input=None, format=None):
         if input is None:
-            return datetime.datetime.now(pytz.UTC).isoformat()
+            return datetime.datetime.now(
+                pytz.UTC  # ty:ignore[invalid-argument-type]
+            ).isoformat()
         if isinstance(input, (int, float)):
-            return datetime.datetime.fromtimestamp(input / 1000, tz=pytz.UTC).isoformat()
+            return datetime.datetime.fromtimestamp(
+                input / 1000, tz=pytz.UTC  # ty:ignore[invalid-argument-type]
+            ).isoformat()
         if isinstance(input, str):
             if format:
                 # Basic mapping for date-fns format tokens to strftime
@@ -559,7 +653,7 @@ class ExtendedGrammar:
                     py_format = py_format.replace(js_token, py_token)
                 dt = datetime.datetime.strptime(input, py_format)
                 # strptime creates naive dt, assume UTC or handle if needed
-                dt = dt.replace(tzinfo=pytz.UTC)
+                dt = dt.replace(tzinfo=pytz.UTC)  # ty:ignore[invalid-argument-type]
                 return dt.isoformat()
             try:
                 dt = dtparser.isoparse(input)
@@ -592,7 +686,9 @@ class ExtendedGrammar:
     def datetime_format(input, format_str):
         try:
             if isinstance(input, (int, float)):
-                dt = datetime.datetime.fromtimestamp(input / 1000, tz=pytz.UTC)
+                dt = datetime.datetime.fromtimestamp(
+                    input / 1000, tz=pytz.UTC  # ty:ignore[invalid-argument-type]
+                )
             else:
                 dt = dtparser.parse(input)
                 if dt.tzinfo is None:
