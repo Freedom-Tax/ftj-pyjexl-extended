@@ -1,26 +1,13 @@
-import math
-import random
-
-import pythonmonkey as pm
-
-from .extended_grammar import ExtendedGrammar
 from .jexl import JEXL
+from .extended_grammar import ExtendedGrammar
+import random
+import math
 
 
 class JexlExtended(JEXL):
     def __init__(self, context=None):
         super().__init__(context=context)
         self._extended_grammar = ExtendedGrammar(self)
-
-        """ JS function """
-
-        super().add_transform("ftjAmountAdd", self._extended_grammar.ftj_amount_add)
-        super().add_transform(
-            "ftjAmountSubtract", self._extended_grammar.ftj_amount_subtract
-        )
-        super().add_transform(
-            "ftjAmountMultiply", self._extended_grammar.ftj_amount_multiply
-        )
 
         """ String functions """
 
